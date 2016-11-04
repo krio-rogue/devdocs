@@ -1,55 +1,38 @@
 module Docs
   class Ember < UrlScraper
+    include MultipleBaseUrls
+
     self.name = 'Ember.js'
     self.slug = 'ember'
     self.type = 'ember'
-    self.version = '1.3.0'
-    self.base_url = 'http://emberjs.com/api/'
+    self.release = '2.8.2'
+    self.base_urls = ['http://emberjs.com/api/', "https://guides.emberjs.com/v2.8.0/"]
+    self.links = {
+      home: 'http://emberjs.com/',
+      code: 'https://github.com/emberjs/ember.js'
+    }
 
-    html_filters.push 'ember/clean_html', 'ember/entries', 'title'
+    html_filters.push 'ember/entries', 'ember/clean_html', 'title'
+
+    options[:trailing_slash] = false
 
     options[:title] = false
     options[:root_title] = 'Ember.js'
 
     options[:container] = ->(filter) do
-      filter.root_page? ? '#toc-list' : '#content'
+      if filter.base_url.path.start_with?('/api')
+        filter.root_page? ? '#toc-list' : '#content'
+      else
+        'main'
+      end
     end
 
     # Duplicates
-    options[:skip] = %w(
-      classes/String.html
-      data/classes/DS.html)
-
-    # Empty
-    options[:skip].concat %w(
-      classes/Ember.State.html
-      classes/Ember.StateManager.html
-      data/classes/DS.AdapterPopulatedRecordArray.html
-      data/classes/DS.FilteredRecordArray.html)
-
-    # Private
-    options[:skip].concat %w(
-      classes/Ember.Descriptor.html
-      classes/Ember.EachProxy.html
-      classes/Ember.EventDispatcher.html
-      classes/Ember.Handlebars.Compiler.html
-      classes/Ember.Handlebars.JavaScriptCompiler.html
-      classes/Ember.Map.html
-      classes/Ember.MapWithDefault.html
-      classes/Ember.OrderedSet.html
-      classes/Ember.TextSupport.html
-      data/classes/DS.AdapterPopulatedRecordArray.html
-      data/classes/DS.AttributeChange.html
-      data/classes/DS.DebugAdapter.html
-      data/classes/DS.RecordArrayManager.html
-      data/classes/DS.RelationshipChange.html
-      data/classes/DS.RelationshipChangeAdd.html
-      data/classes/DS.RelationshipChangeRemove.html)
-
-    options[:skip_patterns] = [/\._/]
+    options[:skip] = %w(classes/String.html data/classes/DS.html)
+    options[:skip_patterns] = [/\._/, /contributing/]
 
     options[:attribution] = <<-HTML
-      &copy; 2014 Yehuda Katz, Tom Dale and Ember.js contributors<br>
+      &copy; 2016 Yehuda Katz, Tom Dale and Ember.js contributors<br>
       Licensed under the MIT License.
     HTML
   end

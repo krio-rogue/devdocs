@@ -12,15 +12,14 @@ $.id = (id) ->
   document.getElementById(id)
 
 $.hasChild = (parent, el) ->
-  return unless parent and el
-  loop
+  return unless parent
+  while el
     return true if el is parent
     return if el is document.body
     el = el.parentElement
 
 $.closestLink = (el, parent = document.body) ->
-  return unless el and parent
-  loop
+  while el
     return el if el.tagName is 'A'
     return if el is parent
     el = el.parentElement
@@ -29,18 +28,18 @@ $.closestLink = (el, parent = document.body) ->
 # Events
 #
 
-$.on = (el, event, callback) ->
+$.on = (el, event, callback, useCapture = false) ->
   if event.indexOf(' ') >= 0
     $.on el, name, callback for name in event.split(' ')
   else
-    el.addEventListener(event, callback)
+    el.addEventListener(event, callback, useCapture)
   return
 
-$.off = (el, event, callback) ->
+$.off = (el, event, callback, useCapture = false) ->
   if event.indexOf(' ') >= 0
     $.off el, name, callback for name in event.split(' ')
   else
-    el.removeEventListener(event, callback)
+    el.removeEventListener(event, callback, useCapture)
   return
 
 $.trigger = (el, type, canBubble = true, cancelable = true) ->
@@ -112,9 +111,9 @@ $.after = (el, value) ->
 
 $.remove = (value) ->
   if $.isCollection(value)
-    el.parentElement.removeChild(el) for el in $.makeArray(value)
+    el.parentElement?.removeChild(el) for el in $.makeArray(value)
   else
-    value.parentElement.removeChild(value)
+    value.parentElement?.removeChild(value)
   return
 
 $.empty = (el) ->
@@ -158,7 +157,7 @@ $.offset = (el, container = document.body) ->
 $.scrollParent = (el) ->
   while el = el.parentElement
     break if el.scrollTop > 0
-    break if getComputedStyle(el).overflowY in ['auto', 'scroll']
+    break if getComputedStyle(el)?.overflowY in ['auto', 'scroll']
   el
 
 $.scrollTo = (el, parent, position = 'center', options = {}) ->
@@ -174,7 +173,7 @@ $.scrollTo = (el, parent, position = 'center', options = {}) ->
 
   switch position
     when 'top'
-      parent.scrollTop = top - (options.margin or 20)
+      parent.scrollTop = top - (if options.margin? then options.margin else 20)
     when 'center'
       parent.scrollTop = top - Math.round(parentHeight / 2 - el.offsetHeight / 2)
     when 'continuous'
@@ -224,6 +223,36 @@ $.lockScroll = (el, fn) ->
     fn()
   return
 
+smoothScroll =  smoothStart = smoothEnd = smoothDistance = smoothDuration = null
+
+$.smoothScroll = (el, end) ->
+  unless window.requestAnimationFrame
+    el.scrollTop = end
+    return
+
+  smoothEnd = end
+
+  if smoothScroll
+    newDistance = smoothEnd - smoothStart
+    smoothDuration += Math.min 300, Math.abs(smoothDistance - newDistance)
+    smoothDistance = newDistance
+    return
+
+  smoothStart = el.scrollTop
+  smoothDistance = smoothEnd - smoothStart
+  smoothDuration = Math.min 300, Math.abs(smoothDistance)
+  startTime = Date.now()
+
+  smoothScroll = ->
+    p = Math.min 1, (Date.now() - startTime) / smoothDuration
+    y = Math.max 0, Math.floor(smoothStart + smoothDistance * (if p < 0.5 then 2 * p * p else p * (4 - p * 2) - 1))
+    el.scrollTop = y
+    if p is 1
+      smoothScroll = null
+    else
+      requestAnimationFrame(smoothScroll)
+  requestAnimationFrame(smoothScroll)
+
 #
 # Utilities
 #
@@ -239,6 +268,14 @@ $.makeArray = (object) ->
     object
   else
     Array::slice.apply(object)
+
+$.arrayDelete = (array, object) ->
+  index = array.indexOf(object)
+  if index >= 0
+    array.splice(index, 1)
+    true
+  else
+    false
 
 # Returns true if the object is an array or a collection of DOM elements.
 $.isCollection = (object) ->
@@ -265,6 +302,25 @@ $.escapeRegexp = (string) ->
 $.urlDecode = (string) ->
   decodeURIComponent string.replace(/\+/g, '%20')
 
+$.classify = (string) ->
+  string = string.split('_')
+  for substr, i in string
+    string[i] = substr[0].toUpperCase() + substr[1..]
+  string.join('')
+
+$.framify = (fn, obj) ->
+  if window.requestAnimationFrame
+    (args...) -> requestAnimationFrame(fn.bind(obj, args...))
+  else
+    fn
+
+$.requestAnimationFrame = (fn) ->
+  if window.requestAnimationFrame
+    requestAnimationFrame(fn)
+  else
+    setTimeout(fn, 0)
+  return
+
 #
 # Miscellaneous
 #
@@ -272,11 +328,22 @@ $.urlDecode = (string) ->
 $.noop = ->
 
 $.popup = (value) ->
-  open value.href or value, '_blank'
+  win = window.open()
+  if win
+    win.opener = null if win.opener
+    win.location = value.href or value
+  else
+    window.open value.href or value, '_blank'
   return
 
 $.isTouchScreen = ->
   typeof ontouchstart isnt 'undefined'
+
+$.isWindows = ->
+  navigator.platform?.indexOf('Win') >= 0
+
+$.isMac = ->
+  navigator.userAgent?.indexOf('Mac') >= 0
 
 HIGHLIGHT_DEFAULTS =
   className: 'highlight'
@@ -287,3 +354,18 @@ $.highlight = (el, options = {}) ->
   el.classList.add(options.className)
   setTimeout (-> el.classList.remove(options.className)), options.delay
   return
+
+$.copyToClipboard = (string) ->
+  textarea = document.createElement('textarea')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = 0
+  textarea.value = string
+  document.body.appendChild(textarea)
+  try
+    textarea.select()
+    result = !!document.execCommand('copy')
+  catch
+    result = false
+  finally
+    document.body.removeChild(textarea)
+  result

@@ -2,38 +2,51 @@ module Docs
   class Angular
     class EntriesFilter < Docs::EntriesFilter
       def get_name
-        name = slug.split(':').last
-        name.sub! %r{\Ang\.}, ''
-        name << " (#{subtype})" if subtype == 'directive' || subtype == 'filter'
+        if slug.start_with?('tutorial') || slug.start_with?('guide')
+          name = at_css('.nav-list-item.is-selected').content.strip
+        else
+          name = at_css('header.hero h1').content.strip
+        end
+
+        name = name.split(':').first
+
+        if mod
+          if name == 'Index'
+            return slug.split('/')[1..-2].join('/')
+          elsif name == 'Angular'
+            return slug.split('/').last.split('-').first
+          end
+        end
+
+        name << '()' if at_css('.hero-subtitle').try(:content) == 'Function'
         name
       end
 
       def get_type
-        type = slug.split('.').first
-        type << " #{subtype}s" if type == 'ng' && subtype
-        type
-      end
-
-      def subtype
-        return @subtype if defined? @subtype
-        node = at_css 'h1'
-        data = node.content.match %r{\((.+) in module} if node
-        @subtype = data && data[1]
-      end
-
-      def additional_entries
-        entries = []
-
-        css('ul.defs').each do |list|
-          list.css('> li > h3:first-child').each do |node|
-            name = node.content.strip
-            name.sub! %r{\(.+\)}, '()'
-            name.prepend "#{self.name.split.first}."
-            entries << [name, node['id']]
-          end
+        if slug.start_with?('guide/')
+          'Guide'
+        elsif slug.start_with?('cookbook/')
+          'Cookbook'
+        elsif slug == 'glossary'
+          'Guide'
+        else
+          type = at_css('.nav-title.is-selected').content.strip
+          type.remove! ' Reference'
+          type << ": #{mod}" if mod
+          type
         end
+      end
 
-        entries
+      INDEX = Set.new
+
+      def include_default_entry?
+        INDEX.add?([name, type].join(';')) ? true : false # ¯\_(ツ)_/¯
+      end
+
+      private
+
+      def mod
+        @mod ||= slug[/api\/([\w\-]+)\//, 1]
       end
     end
   end

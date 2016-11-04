@@ -1,96 +1,61 @@
 module Docs
   class Rails < Rdoc
-    # Generated with:
-    # find \
-    #   actionmailer \
-    #   actionpack \
-    #   activemodel \
-    #   activerecord \
-    #   activesupport \
-    #   railties \
-    #   -name '*.rb' \
-    #   -not -name 'version.rb' \
-    #   -not -wholename '*generators/*' \
-    #   -not -wholename '*test/*' \
-    #   -not -wholename '*examples/*' \
-    # | xargs \
-    #   rdoc --format=darkfish --no-line-numbers --op=rdoc --visibility=public
-
     self.name = 'Ruby on Rails'
     self.slug = 'rails'
-    self.version = '4.0.2'
     self.dir = '/Users/Thibaut/DevDocs/Docs/RDoc/Rails'
+    self.links = {
+      home: 'http://rubyonrails.org/',
+      code: 'https://github.com/rails/rails'
+    }
 
     html_filters.replace 'rdoc/entries', 'rails/entries'
 
     options[:root_title] = 'Ruby on Rails'
 
     options[:skip] += %w(
-      AbstractController/Callbacks.html
-      AbstractController/UrlFor.html
-      ActionController.html
       ActionController/Instrumentation.html
-      ActionController/ModelNaming.html
       ActionController/Rendering.html
-      ActionController/Rescue.html
-      ActionController/UrlFor.html
-      ActionDispatch/DebugExceptions.htnl
-      ActionDispatch/Http/FilterParameters.html
-      ActionDispatch/Http/URL.html
-      ActionDispatch/Integration/Runner.html
-      ActionDispatch/Integration/Session.html
+      ActionDispatch/DebugExceptions.html
+      ActionDispatch/Journey/Parser.html
       ActionDispatch/Reloader.html
-      ActionDispatch/RequestId.html
       ActionDispatch/Routing/HtmlTableFormatter.html
-      ActionDispatch/Routing/Mapper.html
       ActionDispatch/ShowExceptions.html
-      ActionView.html
-      ActionView/Context.html
-      ActionView/DependencyTracker/ERBTracker.html
-      ActionView/FileSystemResolver.html
       ActionView/FixtureResolver.html
       ActionView/LogSubscriber.html
-      ActionView/ModelNaming.html
-      ActionView/Template/Handlers/Erubis.html
-      ActiveModel.html
-      ActiveModel/Lint/Tests.html
-      ActiveRecord.html
-      ActiveRecord/DynamicMatchers/Finder.html
-      ActiveRecord/Sanitization.html
+      ActionView/TestCase/Behavior/RenderedViewsCollection.html
       ActiveRecord/Tasks/DatabaseTasks.html
-      ActiveSupport.html
-      ActiveSupport/Configurable/Configuration.html
       ActiveSupport/Dependencies/WatchStack.html
-      ActiveSupport/DescendantsTracker.html
-      ActiveSupport/FileUpdateChecker.html
-      ActiveSupport/Notifications/Fanout.html
-      ActiveSupport/Testing/ConstantLookup.html
-      ActiveSupport/Testing/Declarative.html
-      ActiveSupport/Testing/Isolation/Subprocess.html
-      Rails/API/Task.html
-      Rails/ConsoleMethods.html)
+      ActiveSupport/Notifications/Fanout.html)
 
-    options[:skip_patterns] = [
-      /\AAbstractController\/ViewPaths/,
-      /\AActionController\/Caching(?!\/Fragments|\.)/,
-      /\AActionController\/HideActions/,
-      /\AActionController\/RequestForgeryProtection\/ProtectionMethods/,
-      /\AActionController\/Test/,
-      /\AActionDispatch\/RemoteIp/,
-      /\AActionDispatch\/Test/,
-      /\AActionMailer\/DeliveryMethods/,
+    options[:skip_patterns] += [
+      /\AActionController\/Testing/,
       /\AActionView\/LookupContext/,
       /\AActionView\/Resolver/,
-      /\AActiveRecord\/ConnectionAdapters\/(?!DatabaseStatements|SchemaStatements|Table)/,
-      /\AActiveSupport\/JSON\//,
       /\AActiveSupport\/Multibyte\/Unicode\//,
       /\AActiveSupport\/XML/i,
-      /\ALogger/,
-      /\ASourceAnnotationExtractor/]
+      /\ASourceAnnotationExtractor/,
+      /\AI18n\/Railtie/,
+      /\AMinitest/,
+      /\ARails\/API/,
+      /\ARails\/AppBuilder/,
+      /\ARails\/PluginBuilder/,
+      /\ARails\/Generators\/Testing/]
 
     options[:attribution] = <<-HTML
-      &copy; 2004&ndash;2013 David Heinemeier Hansson<br>
+      &copy; 2004&ndash;2016 David Heinemeier Hansson<br>
       Licensed under the MIT License.
     HTML
+
+    version '5.0' do
+      self.release = '5.0.0'
+    end
+
+    version '4.2' do
+      self.release = '4.2.6'
+    end
+
+    version '4.1' do
+      self.release = '4.1.15'
+    end
   end
 end

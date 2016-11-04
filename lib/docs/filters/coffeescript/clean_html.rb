@@ -15,7 +15,10 @@ module Docs
         end
 
         # Remove Books, Screencasts, etc.
-        css('#scripts ~ *', '#scripts').remove
+        while doc.children.last['id'] != 'scripts'
+          doc.children.last.remove
+        end
+        doc.children.last.remove
 
         # Make proper headings
         css('.header').each do |node|
@@ -45,6 +48,14 @@ module Docs
         # Remove code highlighting
         css('pre').each do |node|
           node.content = node.content
+        end
+
+        css('.code pre:first-child').each do |node|
+          node['data-language'] = 'coffeescript'
+        end
+
+        css('.code pre:last-child').each do |node|
+          node['data-language'] = 'javascript'
         end
 
         css('tt').each do |node|

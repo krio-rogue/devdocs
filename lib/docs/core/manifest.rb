@@ -14,8 +14,11 @@ module Docs
     end
 
     def as_json
-      indexed_docs.map(&:as_json).each do |json|
-        json[:mtime] = @store.mtime(json[:index_path]).to_i
+      indexed_docs.map do |doc|
+        json = doc.as_json
+        json[:mtime] = doc_mtime(doc)
+        json[:db_size] = doc_db_size(doc)
+        json
       end
     end
 
@@ -27,8 +30,16 @@ module Docs
 
     def indexed_docs
       @docs.select do |doc|
-        @store.exist? doc.index_path
+        @store.exist?(doc.index_path) && @store.exist?(doc.db_path)
       end
+    end
+
+    def doc_mtime(doc)
+      [@store.mtime(doc.index_path).to_i, @store.mtime(doc.db_path).to_i].max
+    end
+
+    def doc_db_size(doc)
+      @store.size(doc.db_path)
     end
   end
 end

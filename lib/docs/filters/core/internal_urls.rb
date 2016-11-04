@@ -9,6 +9,7 @@ module Docs
 
     def update_links
       css('a').each do |link|
+        next if context[:skip_link].is_a?(Proc) && context[:skip_link].call(link)
         next unless url = to_internal_url(link['href'])
         link['href'] = internal_path_to(url)
         yield url if block_given?
@@ -80,6 +81,7 @@ module Docs
     def internal_path_to(url)
       url = index_url if url == root_url
       path = effective_url.relative_path_to(url)
+      path = clean_path(path) if context[:decode_and_clean_paths]
       URL.new(path: path, query: url.query, fragment: url.fragment).to_s
     end
 

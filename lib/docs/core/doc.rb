@@ -1,12 +1,46 @@
 module Docs
   class Doc
     INDEX_FILENAME = 'index.json'
+    DB_FILENAME = 'db.json'
 
     class << self
-      attr_accessor :name, :slug, :type, :version, :abstract
+      include Instrumentable
+
+      attr_accessor :name, :slug, :type, :release, :abstract, :links
 
       def inherited(subclass)
         subclass.type = type
+      end
+
+      def version(version = nil, &block)
+        return @version unless block_given?
+
+        klass = Class.new(self)
+        klass.name = name
+        klass.slug = slug
+        klass.version = version
+        klass.release = release
+        klass.links = links
+        klass.class_exec(&block)
+        @versions ||= []
+        @versions << klass
+        klass
+      end
+
+      def version=(value)
+        @version = value.to_s
+      end
+
+      def versions
+        @versions.presence || [self]
+      end
+
+      def version?
+        version.present?
+      end
+
+      def versioned?
+        @versions.presence
       end
 
       def name
@@ -14,7 +48,17 @@ module Docs
       end
 
       def slug
-        @slug || name.try(:downcase)
+        slug = @slug || name.try(:downcase)
+        version? ? "#{slug}~#{version_slug}" : slug
+      end
+
+      def version_slug
+        return if version.blank?
+        slug = version.downcase
+        slug.gsub! '+', 'p'
+        slug.gsub! '#', 's'
+        slug.gsub! %r{[^a-z0-9\_\.]}, '_'
+        slug
       end
 
       def path
@@ -25,46 +69,62 @@ module Docs
         File.join path, INDEX_FILENAME
       end
 
+      def db_path
+        File.join path, DB_FILENAME
+      end
+
       def as_json
-        { name: name,
-          slug: slug,
-          type: type,
-          version: version,
-          index_path: index_path }
-      end
-
-      def index_page(id)
-        if (page = new.build_page(id)) && page[:entries].present?
-          yield page[:store_path], page[:output]
-          index = EntryIndex.new
-          index.add page[:entries]
-          index
-        end
-      end
-
-      def index_pages
-        index = EntryIndex.new
-        new.build_pages do |page|
-          next if page[:entries].blank?
-          yield page[:store_path], page[:output]
-          index.add page[:entries]
-        end
-        index.empty? ? nil : index
+        json = { name: name, slug: slug, type: type }
+        json[:links] = links if links.present?
+        json[:version] = version if version.present? || defined?(@version)
+        json[:release] = release if release.present?
+        json
       end
 
       def store_page(store, id)
-        store.open path do
-          index = index_page(id, &store.method(:write))
-          !!index
+        store.open(path) do
+          if page = new.build_page(id) and store_page?(page)
+            store.write page[:store_path], page[:output]
+            true
+          else
+            false
+          end
         end
       end
 
       def store_pages(store)
-        store.replace path do
-          index = index_pages(&store.method(:write))
-          store.write INDEX_FILENAME, index.to_json if index
-          !!index
+        index = EntryIndex.new
+        pages = PageDb.new
+
+        store.replace(path) do
+          new.build_pages do |page|
+            next unless store_page?(page)
+            store.write page[:store_path], page[:output]
+            index.add page[:entries]
+            pages.add page[:path], page[:output]
+          end
+
+          if index.present?
+            store_index(store, INDEX_FILENAME, index)
+            store_index(store, DB_FILENAME, pages)
+            true
+          else
+            false
+          end
         end
+      end
+
+      private
+
+      def store_page?(page)
+        page[:entries].present?
+      end
+
+      def store_index(store, filename, index)
+        old_json = store.read(filename) || '{}'
+        new_json = index.to_json
+        instrument "#{filename.remove('.json')}.doc", before: old_json, after: new_json
+        store.write(filename, new_json)
       end
     end
 

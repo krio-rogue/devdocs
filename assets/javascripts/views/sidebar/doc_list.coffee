@@ -1,19 +1,26 @@
 class app.views.DocList extends app.View
   @className: '_list'
+  @attributes:
+    role: 'navigation'
 
   @events:
     open:  'onOpen'
     close: 'onClose'
+    click: 'onClick'
 
   @routes:
     after: 'afterRoute'
 
+  @elements:
+    disabledTitle: '._list-title'
+    disabledList: '._disabled-list'
+
   init: ->
     @lists = {}
 
-    @addSubview @listSelect = new app.views.ListSelect @el
-    @addSubview @listFocus  = new app.views.ListFocus @el unless $.isTouchScreen()
+    @addSubview @listFocus  = new app.views.ListFocus @el unless app.isMobile()
     @addSubview @listFold   = new app.views.ListFold @el
+    @addSubview @listSelect = new app.views.ListSelect @el
 
     app.on 'ready', @render
     return
@@ -31,18 +38,53 @@ class app.views.DocList extends app.View
 
   render: =>
     @html @tmpl('sidebarDoc', app.docs.all())
-    unless app.isSingleDoc() or app.settings.hasDocs()
-      @append @tmpl('sidebarDoc', app.disabledDocs.all(), disabled: true)
+    @renderDisabled() unless app.isSingleDoc() or app.disabledDocs.size() is 0
     return
 
-  reset: ->
+  renderDisabled: ->
+    @append @tmpl('sidebarDisabled', count: app.disabledDocs.size())
+    @refreshElements()
+    @renderDisabledList()
+    return
+
+  renderDisabledList: ->
+    if app.settings.get('hideDisabled')
+      @removeDisabledList()
+    else
+      @appendDisabledList()
+    return
+
+  appendDisabledList: ->
+    html = ''
+    docs = [].concat(app.disabledDocs.all()...)
+
+    while doc = docs.shift()
+      if doc.version?
+        versions = ''
+        loop
+          versions += @tmpl('sidebarDoc', doc, disabled: true)
+          break if docs[0]?.name isnt doc.name
+          doc = docs.shift()
+        html += @tmpl('sidebarDisabledVersionedDoc', doc, versions)
+      else
+        html += @tmpl('sidebarDoc', doc, disabled: true)
+
+    @append @tmpl('sidebarDisabledList', html)
+    @disabledTitle.classList.add('open-title')
+    @refreshElements()
+    return
+
+  removeDisabledList: ->
+    $.remove @disabledList if @disabledList
+    @disabledTitle.classList.remove('open-title')
+    @refreshElements()
+    return
+
+  reset: (options = {}) ->
     @listSelect.deselect()
     @listFocus?.blur()
     @listFold.reset()
-
-    if model = app.router.context.type or app.router.context.entry
-      @reveal model
-      @select model
+    @revealCurrent() if options.revealCurrent
     return
 
   onOpen: (event) =>
@@ -73,12 +115,28 @@ class app.views.DocList extends app.View
   reveal: (model) ->
     @openDoc model.doc
     @openType model.getType() if model.type
+    @focus model
     @paginateTo model
     @scrollTo model
     return
 
+  focus: (model) ->
+    @listFocus?.focus @find("a[href='#{model.fullPath()}']")
+    return
+
+  revealCurrent: ->
+    if model = app.router.context.type or app.router.context.entry
+      @reveal model
+      @select model
+    return
+
   openDoc: (doc) ->
+    @listFold.open @find("[data-slug='#{doc.slug_without_version}']") if app.disabledDocs.contains(doc) and doc.version
     @listFold.open @find("[data-slug='#{doc.slug}']")
+    return
+
+  closeDoc: (doc) ->
+    @listFold.close @find("[data-slug='#{doc.slug}']")
     return
 
   openType: (type) ->
@@ -90,12 +148,36 @@ class app.views.DocList extends app.View
     return
 
   scrollTo: (model) ->
-    $.scrollTo @find("a[href='#{model.fullPath()}']")
+    $.scrollTo @find("a[href='#{model.fullPath()}']"), null, 'top', margin: 0
+    return
+
+  toggleDisabled: ->
+    if @disabledTitle.classList.contains('open-title')
+      @removeDisabledList()
+      app.settings.set 'hideDisabled', true
+    else
+      @appendDisabledList()
+      app.settings.set 'hideDisabled', false
+    return
+
+  onClick: (event) =>
+    if @disabledTitle and $.hasChild(@disabledTitle, event.target)
+      $.stopEvent(event)
+      @toggleDisabled()
+    else if slug = event.target.getAttribute('data-enable')
+      $.stopEvent(event)
+      doc = app.disabledDocs.findBy('slug', slug)
+      app.enableDoc(doc, @onEnabled, @onEnabled)
+    return
+
+  onEnabled: =>
+    @reset()
+    @render()
     return
 
   afterRoute: (route, context) =>
     if context.init
-      @reset()
+      @reset revealCurrent: true if @activated
     else
       @select context.type or context.entry
     return

@@ -1,25 +1,23 @@
+#= require app/searcher
+
 class app.models.Entry extends app.Model
   # Attributes: name, type, path
 
-  SEPARATORS_REGEXP = /\:?\ |#|::/g
-  PARANTHESES_REGEXP = /\(.*?\)$/
-
   constructor: ->
     super
-    @text = @searchValue()
+    @text = applyAliases(app.Searcher.normalizeString(@name))
 
-  searchValue: ->
-    @name
-      .toLowerCase()
-      .replace('...', ' ')
-      .replace(' event', '')
-      .replace(SEPARATORS_REGEXP, '.')
-      .replace(/\.+/g, '.')
-      .replace(PARANTHESES_REGEXP, '')
-      .trim()
+  addAlias: (name) ->
+    text = applyAliases(app.Searcher.normalizeString(name))
+    @text = [@text] unless Array.isArray(@text)
+    @text.push(if Array.isArray(text) then text[1] else text)
+    return
 
   fullPath: ->
     @doc.fullPath if @isIndex() then '' else @path
+
+  dbPath: ->
+    @path.replace /#.*/, ''
 
   filePath: ->
     @doc.fullPath @_filePath()
@@ -39,8 +37,42 @@ class app.models.Entry extends app.Model
     @doc.types.findBy 'name', @type
 
   loadFile: (onSuccess, onError) ->
-    ajax
-      url: @fileUrl()
-      dataType: 'html'
-      success: onSuccess
-      error: onError
+    app.db.load(@, onSuccess, onError)
+
+  applyAliases = (string) ->
+    if ALIASES.hasOwnProperty(string)
+      return [string, ALIASES[string]]
+    else
+      words = string.split('.')
+      for word, i in words when ALIASES.hasOwnProperty(word)
+        words[i] = ALIASES[word]
+        return [string, words.join('.')]
+    return string
+
+  @ALIASES = ALIASES =
+    'angular': 'ng'
+    'angular.js': 'ng'
+    'backbone.js': 'bb'
+    'c++': 'cpp'
+    'coffeescript': 'cs'
+    'elixir': 'ex'
+    'javascript': 'js'
+    'jquery': '$'
+    'knockout.js': 'ko'
+    'less': 'ls'
+    'lodash': '_'
+    'marionette': 'mn'
+    'markdown': 'md'
+    'modernizr': 'mdr'
+    'moment.js': 'mt'
+    'nginx': 'ngx'
+    'numpy': 'np'
+    'pandas': 'pd'
+    'postgresql': 'pg'
+    'python': 'py'
+    'ruby.on.rails': 'ror'
+    'ruby': 'rb'
+    'sass': 'scss'
+    'tensorflow': 'tf'
+    'typescript': 'ts'
+    'underscore.js': '_'

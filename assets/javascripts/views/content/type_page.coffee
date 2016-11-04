@@ -8,12 +8,11 @@ class app.views.TypePage extends app.View
     return
 
   render: (@type) ->
-    @type = type
     @html @tmpl('typePage', @type)
     return
 
   getTitle: ->
-    "#{@type.doc.name}/#{@type.name}"
+    "#{@type.doc.fullName} / #{@type.name}"
 
   onRoute: (context) ->
     @render context.type

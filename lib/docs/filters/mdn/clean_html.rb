@@ -6,17 +6,35 @@ module Docs
         '.htab',             # "Browser compatibility" tabs
         '.breadcrumbs',      # (e.g. CSS/animation)
         '.Quick_links',      # (e.g. CSS/animation)
-        '.HTMLElmNav',       # (e.g. HTML/a)
-        '.htmlMinVerHeader', # (e.g. HTML/article)
-        '.geckoVersionNote', # (e.g. HTML/li)
         '.todo',
-        '.draftHeader']
+        '.draftHeader',
+        '.hidden',
+        '.button.section-edit',
+        '.communitybox',
+        '#Quick_Links',
+        'hr']
 
       def call
         css(*REMOVE_NODES).remove
 
         css('td.header').each do |node|
           node.name = 'th'
+        end
+
+        css('nobr', 'span[style*="font"]', 'pre code', 'h2 strong').each do |node|
+          node.before(node.children).remove
+        end
+
+        css('h2[style]', 'pre[style]', 'th[style]', 'div[style*="line-height"]', 'table[style]', 'pre p[style]').remove_attr('style')
+
+        css('h2 > a[name]', 'h3 > a[name]').each do |node|
+          node.parent['id'] = node['name']
+          node.before(node.content).remove
+        end
+
+        css('pre[class^="brush"]').each do |node|
+          node['data-language'] = node['class'][/brush: ?(\w+)/, 1]
+          node.remove_attribute('class')
         end
 
         doc

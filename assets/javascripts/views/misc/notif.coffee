@@ -1,6 +1,8 @@
 class app.views.Notif extends app.View
   @className: '_notif'
   @activeClass: '_in'
+  @attributes:
+    role: 'alert'
 
   @defautOptions:
     autoHide: 15000
@@ -41,14 +43,15 @@ class app.views.Notif extends app.View
     return
 
   position: ->
-    notifications = $$ ".#{@constructor.className}"
+    notifications = $$ ".#{app.views.Notif.className}"
     if notifications.length
       lastNotif = notifications[notifications.length - 1]
       @el.style.top = lastNotif.offsetTop + lastNotif.offsetHeight + 16 + 'px'
     return
 
   onClick: (event) =>
-    unless event.target.tagName is 'A'
+    return if event.which isnt 1
+    if event.target.tagName isnt 'A' or event.target.classList.contains('_notif-close')
       $.stopEvent(event)
       @hide()
     return

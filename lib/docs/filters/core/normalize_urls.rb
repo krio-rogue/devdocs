@@ -12,15 +12,22 @@ module Docs
     def update_attribute(tag, attribute)
       css(tag.to_s).each do |node|
         next unless value = node[attribute]
-        next if fragment_url_string?(value)
+        next if fragment_url_string?(value) || data_url_string?(value)
         node[attribute] = normalize_url(value)
       end
     end
 
     def normalize_url(str)
+      str.strip!
+      str.gsub!(' ', '%20')
+      str = context[:fix_urls_before_parse].call(str) if context[:fix_urls_before_parse]
       url = to_absolute_url(str)
-      fix_url(url)
-      fix_url_string(url.to_s)
+
+      while new_url = fix_url(url)
+        url = new_url
+      end
+
+      url.to_s
     rescue URI::InvalidURIError
       '#'
     end
@@ -31,18 +38,40 @@ module Docs
     end
 
     def fix_url(url)
-      return unless context[:replace_paths]
-      path = subpath_to(url)
+      if context[:redirections]
+        url = URL.parse(url)
+        path = url.path.downcase
 
-      if context[:replace_paths].has_key?(path)
-        url.path = url.path.sub %r[#{path}\z], context[:replace_paths][path]
+        if context[:redirections].key?(path)
+          url.path = context[:redirections][path]
+          return url
+        end
       end
-    end
 
-    def fix_url_string(str)
-      str = context[:replace_urls][str]  || str if context[:replace_urls]
-      str = context[:fix_urls].call(str) || str if context[:fix_urls]
-      str
+      if context[:replace_paths]
+        url = URL.parse(url)
+        path = subpath_to(url)
+
+        if context[:replace_paths].key?(path)
+          url.path = url.path.sub %r[#{path}\z], context[:replace_paths][path]
+          return url
+        end
+      end
+
+      if context[:replace_urls]
+        url = url.to_s
+
+        if context[:replace_urls].key?(url)
+          return context[:replace_urls][url]
+        end
+      end
+
+      if context[:fix_urls]
+        url = url.to_s
+        orig_url = url.dup
+        new_url = context[:fix_urls].call(url)
+        return new_url if new_url != orig_url
+      end
     end
   end
 end

@@ -58,6 +58,17 @@ class DocsUrlScraperTest < MiniTest::Spec
       result
     end
 
+    it "runs a Requester with .headers as :request_options" do
+      stub(Scraper).headers { { testheader: true } }
+      mock(Docs::Requester).run anything, satisfy { |options| options[:request_options][:headers][:testheader] }
+      result
+    end
+
+    it "runs a Requester with default .headers as :request_options" do
+      mock(Docs::Requester).run anything, satisfy { |options| options[:request_options][:headers]["User-Agent"] }
+      result
+    end
+
     it "runs a Requester with .params as :request_options" do
       stub(Scraper).params { { test: true } }
       mock(Docs::Requester).run anything, satisfy { |options| options[:request_options][:params][:test] }
@@ -78,11 +89,16 @@ class DocsUrlScraperTest < MiniTest::Spec
 
   describe "#process_response?" do
     let :response do
-      OpenStruct.new success?: true, html?: true, effective_url: scraper.root_url
+      OpenStruct.new success?: true, html?: true, effective_url: scraper.root_url, error?: false
     end
 
     let :result do
       scraper.send :process_response?, response
+    end
+
+    it "raises when the response is an error" do
+      response.send 'error?=', true
+      assert_raises(RuntimeError) { result }
     end
 
     it "returns false when the response isn't successful" do

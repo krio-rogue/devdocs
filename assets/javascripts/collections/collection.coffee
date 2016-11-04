@@ -21,6 +21,10 @@ class app.Collection
       @models.push new (@model())(object)
     return
 
+  remove: (model) ->
+    @models.splice @models.indexOf(model), 1
+    return
+
   size: ->
     @models.length
 
@@ -33,6 +37,9 @@ class app.Collection
 
   all: ->
     @models
+
+  contains: (model) ->
+    @models.indexOf(model) >= 0
 
   findBy: (attr, value) ->
     for model in @models

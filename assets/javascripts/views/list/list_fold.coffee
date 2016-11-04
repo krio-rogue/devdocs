@@ -52,6 +52,7 @@ class app.views.ListFold extends app.View
     return
 
   onClick: (event) =>
+    return if event.which isnt 1 or event.metaKey or event.ctrlKey
     return unless event.pageY # ignore fabricated clicks
     el = event.target
 
@@ -59,5 +60,11 @@ class app.views.ListFold extends app.View
       $.stopEvent(event)
       @toggle el.parentElement
     else if el.classList.contains @constructor.targetClass
-      @open el
+      if el.hasAttribute('href')
+        if el.classList.contains(@constructor.activeClass)
+          @close(el) if el.classList.contains(app.views.ListSelect.activeClass)
+        else
+          @open(el)
+      else
+        @toggle(el)
     return

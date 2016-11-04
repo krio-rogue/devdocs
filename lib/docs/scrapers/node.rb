@@ -3,8 +3,10 @@ module Docs
     self.name = 'Node.js'
     self.slug = 'node'
     self.type = 'node'
-    self.version = '0.10.25'
-    self.base_url = 'http://nodejs.org/api/'
+    self.links = {
+      home: 'https://nodejs.org/',
+      code: 'https://github.com/nodejs/node'
+    }
 
     html_filters.push 'node/clean_html', 'node/entries', 'title'
 
@@ -15,7 +17,24 @@ module Docs
 
     options[:attribution] = <<-HTML
       &copy; Joyent, Inc. and other Node contributors<br>
-      Licensed under the MIT License.
+      Licensed under the MIT License.<br>
+      Node.js is a trademark of Joyent, Inc. and is used with its permission.<br>
+      We are not endorsed by or affiliated with Joyent.
     HTML
+
+    version do
+      self.release = '7.0.0'
+      self.base_url = 'https://nodejs.org/dist/latest-v7.x/docs/api/'
+    end
+
+    version '6 LTS' do
+      self.release = '6.9.1'
+      self.base_url = 'https://nodejs.org/dist/latest-v6.x/docs/api/'
+    end
+
+    version '4 LTS' do
+      self.release = '4.6.1'
+      self.base_url = 'https://nodejs.org/dist/latest-v4.x/docs/api/'
+    end
   end
 end

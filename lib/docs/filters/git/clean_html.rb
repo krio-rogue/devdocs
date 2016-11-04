@@ -2,6 +2,7 @@ module Docs
   class Git
     class CleanHtmlFilter < Filter
       def call
+        @doc = at_css('.man-page, #main')
         root_page? ? root : other
         doc
       end
@@ -18,7 +19,11 @@ module Docs
         end
 
         css('> h1').each do |node|
-          node.content = node.content.sub(/\(\d\) Manual Page/, '')
+          node.content = node.content.remove(/\(\d\) Manual Page/)
+        end
+
+        unless at_css('> h1')
+          doc.child.before("<h1>#{slug}</h1>")
         end
 
         unless at_css('> h2')
@@ -33,6 +38,10 @@ module Docs
 
         css('tt', 'p > em').each do |node|
           node.name = 'code'
+        end
+
+        css('pre').each do |node|
+          node.content = node.content.gsub("\t", ' ' * 8)
         end
       end
     end

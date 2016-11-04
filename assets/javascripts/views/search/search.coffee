@@ -16,16 +16,19 @@ class app.views.Search extends app.View
   @shortcuts:
     typing: 'autoFocus'
     altG: 'google'
+    altS: 'stackoverflow'
 
   @routes:
     root: 'onRoot'
-    after: 'autoFocus'
+    after: 'afterRoute'
 
   init: ->
     @addSubview @scope = new app.views.SearchScope @el
 
     @searcher = new app.Searcher
-    @searcher.on 'results', @onResults
+    @searcher
+      .on 'results', @onResults
+      .on 'end', @onEnd
 
     app.on 'ready', @onReady
     $.on window, 'hashchange', @searchUrl
@@ -33,17 +36,27 @@ class app.views.Search extends app.View
     return
 
   focus: ->
-    @input.focus() unless document.activeElement is @input
+    @delay =>
+      @input.focus() unless document.activeElement is @input
     return
 
   autoFocus: =>
-    @focus() unless $.isTouchScreen()
+    unless $.isTouchScreen()
+      @input.focus() unless document.activeElement is @input
     return
 
   reset: ->
     @el.reset()
     @onInput()
     @autoFocus()
+    return
+
+  disable: ->
+    @input.setAttribute('disabled', 'disabled')
+    return
+
+  enable: ->
+    @input.removeAttribute('disabled')
     return
 
   onReady: =>
@@ -66,32 +79,51 @@ class app.views.Search extends app.View
     @addClass @constructor.activeClass
     @trigger 'searching'
 
+    @hasResults = null
     @flags = urlSearch: url, initialResults: true
     @searcher.find @scope.getScope().entries.all(), 'text', @value
     return
 
   searchUrl: =>
-    return unless app.router.isRoot()
-    @scope.searchUrl()
+    if app.router.isRoot()
+      @scope.searchUrl()
+    else if not app.router.isDocIndex()
+      return
 
     return unless value = @extractHashValue()
     @input.value = @value = value
+    @input.setSelectionRange(value.length, value.length)
     @search true
     true
 
   clear: ->
     @removeClass @constructor.activeClass
     @trigger 'clear'
+    return
 
-  google: =>
-    if @value
-      $.popup "https://www.google.com/search?q=#{encodeURIComponent @value}"
+  externalSearch: (url) ->
+    if value = @value
+      value = "#{@scope.name()} #{value}" if @scope.name()
+      $.popup "#{url}#{encodeURIComponent value}"
       @reset()
     return
 
+  google: =>
+    @externalSearch "https://www.google.com/search?q="
+    return
+
+  stackoverflow: =>
+    @externalSearch "https://stackoverflow.com/search?q="
+    return
+
   onResults: (results) =>
+    @hasResults = true if results.length
     @trigger 'results', results, @flags
     @flags.initialResults = false
+    return
+
+  onEnd: =>
+    @trigger 'noresults' unless @hasResults
     return
 
   onClick: (event) =>
@@ -107,13 +139,18 @@ class app.views.Search extends app.View
 
   onRoot: (context) =>
     @reset() unless context.init
-    @delay @searchUrl if context.hash
     return
+
+  afterRoute: (name, context) =>
+    @delay @searchUrl if context.hash
+    @autoFocus()
 
   extractHashValue: ->
     if (value = @getHashValue())?
       app.router.replaceHash()
       value
 
+  HASH_RGX = new RegExp "^##{SEARCH_PARAM}=(.*)"
+
   getHashValue: ->
-    try (new RegExp "##{SEARCH_PARAM}=(.*)").exec($.urlDecode location.hash)?[1] catch
+    try HASH_RGX.exec($.urlDecode location.hash)?[1] catch

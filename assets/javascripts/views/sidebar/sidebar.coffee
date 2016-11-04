@@ -10,18 +10,20 @@ class app.views.Sidebar extends app.View
     escape: 'onEscape'
 
   init: ->
-    @addSubview @hover  = new app.views.SidebarHover @el unless $.isTouchScreen()
+    @addSubview @hover  = new app.views.SidebarHover @el unless app.isMobile() or $.isTouchScreen()
     @addSubview @search = new app.views.Search
 
     @search
-      .on('searching', @showResults)
-      .on('clear', @showDocList)
+      .on 'searching', @showResults
+      .on 'clear', @showDocList
+    .scope
+      .on 'change', @onScopeChange
 
-    @results = new app.views.Results @search
+    @results = new app.views.Results @, @search
     @docList = new app.views.DocList
     @docPicker = new app.views.DocPicker unless app.isSingleDoc()
 
-    app.on 'ready', @showDocList
+    app.on 'ready', @onReady
     $.on document, 'click', @onGlobalClick if @docPicker
     return
 
@@ -30,16 +32,22 @@ class app.views.Sidebar extends app.View
       @hover?.hide()
       @saveScrollPosition()
       @view?.deactivate()
-      @html @view = view
-      @append @tmpl('sidebarSettings') if @view is @docList and @docPicker
+      @view = view
+      @render()
       @view.activate()
       @restoreScrollPosition()
+      if view is @docPicker then @search.disable() else @search.enable()
+    return
+
+  render: ->
+    @html @view
+    @append @tmpl('sidebarSettings') if @view is @docList and @docPicker
     return
 
   showDocList: (reset) =>
     @show @docList
     if reset is true
-      @docList.reset()
+      @docList.reset(revealCurrent: true)
       @search.reset()
     return
 
@@ -49,6 +57,20 @@ class app.views.Sidebar extends app.View
 
   showResults: =>
     @show @results
+    return
+
+  onReady: =>
+    @view = @docList
+    @render()
+    @view.activate()
+
+  reset: ->
+    @showDocList true
+    return
+
+  onScopeChange: (newDoc, previousDoc) =>
+    @docList.closeDoc(previousDoc) if previousDoc
+    if newDoc then @docList.reveal(newDoc.toEntry()) else @scrollToTop()
     return
 
   saveScrollPosition: ->
@@ -69,16 +91,26 @@ class app.views.Sidebar extends app.View
     return
 
   onFocus: (event) =>
-    $.scrollTo event.target, @el, 'continuous', bottomGap: 2
+    $.scrollTo event.target, @el, 'continuous', bottomGap: 2 unless event.target is @el
     return
 
   onClick: (event) =>
+    return if event.which isnt 1
     if event.target.hasAttribute? 'data-reset-list'
       $.stopEvent(event)
-      @showDocList true
+      @reset()
+    else if event.target.hasAttribute? 'data-light'
+      $.stopEvent(event)
+      document.activeElement?.blur()
+      app.document.toggleLight()
+    else if event.target.hasAttribute? 'data-layout'
+      $.stopEvent(event)
+      document.activeElement?.blur()
+      app.document.toggleLayout()
     return
 
   onGlobalClick: (event) =>
+    return if event.which isnt 1
     if event.target.hasAttribute? 'data-pick-docs'
       $.stopEvent(event)
       @showDocPicker()
@@ -87,10 +119,14 @@ class app.views.Sidebar extends app.View
     return
 
   onAltR: =>
-    @showDocList true
+    @reset()
     return
 
   onEscape: =>
-    @showDocList true
+    @reset()
     @scrollToTop()
     return
+
+  onDocEnabled: ->
+    @docList.onEnabled()
+    @reset()

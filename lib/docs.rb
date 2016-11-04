@@ -1,6 +1,7 @@
 require 'bundler/setup'
 Bundler.require :docs
 
+require 'active_support'
 require 'active_support/core_ext'
 I18n.enforce_available_locales = true
 
@@ -24,37 +25,66 @@ module Docs
   mattr_accessor :store_path
   self.store_path = File.expand_path '../public/docs', @@root_path
 
+  mattr_accessor :rescue_errors
+  self.rescue_errors = false
+
   class DocNotFound < NameError; end
 
   def self.all
     Dir["#{root_path}/docs/scrapers/**/*.rb"].
       map { |file| File.basename(file, '.rb') }.
       sort!.
-      map(&method(:find)).
+      map { |name| const_get(name.camelize) }.
       reject(&:abstract)
   end
 
-  def self.find(name)
+  def self.all_versions
+    all.flat_map(&:versions)
+  end
+
+  def self.defaults
+    %w(css dom dom_events html http javascript).map(&method(:find))
+  end
+
+  def self.installed
+    Dir["#{store_path}/**/index.json"].
+      map { |file| file[%r{/([^/]*)/index\.json\z}, 1] }.
+      sort!.
+      map { |path| all_versions.find { |doc| doc.path == path } }.
+      compact
+  end
+
+  def self.find(name, version = nil)
     const = name.camelize
-    const_get(const)
+    doc = const_get(const)
+
+    if version.present?
+      doc = doc.versions.find { |klass| klass.version == version || klass.version_slug == version }
+      raise DocNotFound.new(%(could not find version "#{version}" for doc "#{name}"), name) unless doc
+    elsif version != false
+      doc = doc.versions.first
+    end
+
+    doc
   rescue NameError => error
     if error.name.to_s == const
-      raise DocNotFound.new("failed to locate doc class '#{name}'", name)
+      raise DocNotFound.new(%(could not find doc "#{name}"), name)
     else
       raise error
     end
   end
 
-  def self.generate_page(name, page_id)
-    find(name).store_page(store, page_id)
+  def self.generate_page(name, version, page_id)
+    find(name, version).store_page(store, page_id)
   end
 
-  def self.generate(name)
-    find(name).store_pages(store)
+  def self.generate(doc, version = nil)
+    doc = find(doc, version) unless doc.respond_to?(:store_pages)
+    doc.store_pages(store)
   end
 
   def self.generate_manifest
-    Manifest.new(store, all).store
+    Manifest.new(store, all_versions).store
   end
 
   def self.store

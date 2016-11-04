@@ -18,8 +18,14 @@
 
 #= require_tree ./templates
 
+#= require tracking
+
 init = ->
   document.removeEventListener 'DOMContentLoaded', init, false
-  app.init()
+
+  if document.body
+    app.init()
+  else
+    setTimeout(init, 42)
 
 document.addEventListener 'DOMContentLoaded', init, false

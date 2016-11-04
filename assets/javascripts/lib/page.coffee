@@ -41,6 +41,8 @@ page.show = (path, state) ->
   currentState = context.state
   page.dispatch(context)
   context.pushState()
+  updateCanonicalLink()
+  track()
   context
 
 page.replace = (path, state, skipDispatch, init) ->
@@ -49,6 +51,8 @@ page.replace = (path, state, skipDispatch, init) ->
   currentState = context.state
   page.dispatch(context) unless skipDispatch
   context.replaceState()
+  updateCanonicalLink()
+  track() unless init or skipDispatch
   context
 
 page.dispatch = (context) ->
@@ -59,6 +63,12 @@ page.dispatch = (context) ->
   next()
   return
 
+page.canGoBack = ->
+  not Context.isIntialState(currentState)
+
+page.canGoForward = ->
+  not Context.isLastState(currentState)
+
 currentPath = ->
   location.pathname + location.search + location.hash
 
@@ -66,6 +76,12 @@ class Context
   @initialPath: currentPath()
   @sessionId: Date.now()
   @stateId: 0
+
+  @isIntialState: (state) ->
+    state.id == 0
+
+  @isLastState: (state) ->
+    state.id == @stateId - 1
 
   @isInitialPopState: (state) ->
     state.path is @initialPath and @stateId is 1
@@ -88,7 +104,7 @@ class Context
     return
 
   replaceState: ->
-    history.replaceState @state, '', @path
+    try history.replaceState @state, '', @path # NS_ERROR_FAILURE in Firefox
     return
 
 class Route
@@ -121,7 +137,7 @@ pathtoRegexp = (path, keys) ->
 
   path = "(#{path.join '|'})" if path instanceof Array
   path = path
-    .replace(/\/\(/g, '(?:/')
+    .replace /\/\(/g, '(?:/'
     .replace /(\/)?(\.)?:(\w+)(?:(\(.*?\)))?(\?)?/g, (_, slash = '', format = '', key, capture, optional) ->
       keys.push name: key, optional: !!optional
       str = if optional then '' else slash
@@ -132,8 +148,8 @@ pathtoRegexp = (path, keys) ->
       str += ')'
       str += optional if optional
       str
-    .replace(/([\/.])/g, '\\$1')
-    .replace(/\*/g, '(.*)')
+    .replace /([\/.])/g, '\\$1'
+    .replace /\*/g, '(.*)'
 
   new RegExp "^#{path}$"
 
@@ -147,7 +163,10 @@ onpopstate = (event) ->
   return
 
 onclick = (event) ->
-  return if event.which isnt 1 or event.metaKey or event.ctrlKey or event.shiftKey or event.defaultPrevented
+  try
+    return if event.which isnt 1 or event.metaKey or event.ctrlKey or event.shiftKey or event.defaultPrevented
+  catch
+    return
 
   link = event.target
   link = link.parentElement while link and link.tagName isnt 'A'
@@ -159,3 +178,12 @@ onclick = (event) ->
 
 isSameOrigin = (url) ->
   url.indexOf("#{location.protocol}//#{location.hostname}") is 0
+
+updateCanonicalLink = ->
+  @canonicalLink ||= document.head.querySelector('link[rel="canonical"]')
+  @canonicalLink.setAttribute('href', "http://#{location.host}#{location.pathname}")
+
+track = ->
+  ga?('send', 'pageview', location.pathname + location.search + location.hash)
+  _gauges?.push(['track'])
+  return

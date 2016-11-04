@@ -1,10 +1,13 @@
 class app.views.Results extends app.View
   @className: '_list'
 
+  @events:
+    click: 'onClick'
+
   @routes:
     after: 'afterRoute'
 
-  constructor: (@search) -> super
+  constructor: (@sidebar, @search) -> super
 
   deactivate: ->
     if super
@@ -13,14 +16,16 @@ class app.views.Results extends app.View
 
   init: ->
     @addSubview @listSelect = new app.views.ListSelect @el
-    @addSubview @listFocus  = new app.views.ListFocus @el unless $.isTouchScreen()
+    @addSubview @listFocus  = new app.views.ListFocus @el unless app.isMobile()
 
     @search
-      .on('results', @onResults)
-      .on('clear', @onClear)
+      .on 'results', @onResults
+      .on 'noresults', @onNoResults
+      .on 'clear', @onClear
     return
 
   onResults: (entries, flags) =>
+    @listFocus?.blur() if flags.initialResults
     @empty() if flags.initialResults
     @append @tmpl('sidebarResult', entries)
 
@@ -28,17 +33,25 @@ class app.views.Results extends app.View
       if flags.urlSearch then @openFirst() else @focusFirst()
     return
 
+  onNoResults: =>
+    @html @tmpl('sidebarNoResults')
+    return
+
   onClear: =>
     @empty()
     return
 
   focusFirst: ->
-    @listFocus?.focus @el.firstChild
+    @listFocus?.focus @el.firstElementChild
     return
 
   openFirst: ->
-    @el.firstChild?.click()
+    @el.firstElementChild?.click()
     return
+
+  onDocEnabled: (doc) ->
+    app.router.show(doc.fullPath())
+    @sidebar.onDocEnabled()
 
   afterRoute: (route, context) =>
     if route is 'entry'
@@ -46,3 +59,10 @@ class app.views.Results extends app.View
     else
       @listSelect.deselect()
     return
+
+  onClick: (event) =>
+    return if event.which isnt 1
+    if slug = event.target.getAttribute('data-enable')
+      $.stopEvent(event)
+      doc = app.disabledDocs.findBy('slug', slug)
+      app.enableDoc(doc, @onDocEnabled.bind(@, doc), $.noop)

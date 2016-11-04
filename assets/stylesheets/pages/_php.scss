@@ -4,6 +4,7 @@
     @extend %lined-heading;
   }
 
+  h2 { @extend %block-heading; }
   h3.title { @extend %block-heading; }
 
   .verinfo {
@@ -23,11 +24,11 @@
   .classsynopsis > .methodsynopsis,
   .classsynopsis > .fieldsynopsis { margin-left: 1em; }
 
-  .phpcode > pre { white-space: normal; }
-
   blockquote.note { @extend %note; }
   blockquote.note > p { margin-bottom: 0; }
 
   div.warning { @extend %note, %note-red; }
   div.tip { @extend %note, %note-green; }
+
+  strong > code, dt > code { @extend %label; }
 }

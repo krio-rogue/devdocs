@@ -1,9 +1,12 @@
 class app.views.EntryPage extends app.View
   @className: '_page'
-  @loadingClass: '_page-loading'
+  @errorClass: '_page-error'
 
   @events:
     click: 'onClick'
+
+  @shortcuts:
+    altO: 'onAltO'
 
   @routes:
     before: 'beforeRoute'
@@ -24,17 +27,49 @@ class app.views.EntryPage extends app.View
     @trigger 'loading'
     return
 
-  render: (content = '') ->
+  render: (content = '', fromCache = false) ->
+    return unless @activated
     @empty()
-
     @subview = new (@subViewClass()) @el, @entry
-    @subview.render(content)
+
+    $.batchUpdate @el, =>
+      @subview.render(content, fromCache)
+      @addClipboardLinks() unless fromCache
+      return
 
     if app.disabledDocs.findBy 'slug', @entry.doc.slug
       @hiddenView = new app.views.HiddenPage @el, @entry
 
+    @delay @polyfillMathML
     @trigger 'loaded'
     return
+
+  addClipboardLinks: ->
+    unless @clipBoardLink
+      @clipBoardLink = document.createElement('a')
+      @clipBoardLink.className = '_pre-clip'
+      @clipBoardLink.title = 'Copy to clipboard'
+      @clipBoardLink.tabIndex = -1
+    el.appendChild(@clipBoardLink.cloneNode()) for el in @el.querySelectorAll('pre')
+    return
+
+  polyfillMathML: ->
+    return unless window.supportsMathML is false and !@polyfilledMathML and @find('math')
+    @polyfilledMathML = true
+    $.append document.head, """<link rel="stylesheet" href="#{app.config.mathml_stylesheet}">"""
+    return
+
+  LINKS =
+    home: 'Homepage'
+    code: 'Source code'
+
+  prepareContent: (content) ->
+    return content unless @entry.isIndex() and @entry.doc.links
+
+    links = for link, url of @entry.doc.links
+      """<a href="#{url}" class="_links-link">#{LINKS[link]}</a>"""
+
+    """<p class="_links">#{links.join('')}</p>#{content}"""
 
   empty: ->
     @subview?.deactivate()
@@ -48,11 +83,10 @@ class app.views.EntryPage extends app.View
     return
 
   subViewClass: ->
-    docType = @entry.doc.type
-    app.views["#{docType[0].toUpperCase()}#{docType[1..]}Page"] or app.views.BasePage
+    app.views["#{$.classify(@entry.doc.type)}Page"] or app.views.BasePage
 
   getTitle: ->
-    @entry.doc.name + if @entry.isIndex() then '' else "/#{@entry.name}"
+    @entry.doc.fullName + if @entry.isIndex() then ' documentation' else " / #{@entry.name}"
 
   beforeRoute: =>
     @abort()
@@ -77,13 +111,17 @@ class app.views.EntryPage extends app.View
     return
 
   onSuccess: (response) =>
+    return unless @activated
     @xhr = null
-    @render response
+    @render @prepareContent(response)
     return
 
   onError: =>
     @xhr = null
     @render @tmpl('pageLoadError')
+    @resetClass()
+    @addClass @constructor.errorClass
+    app.appCache?.update()
     return
 
   cache: ->
@@ -98,11 +136,21 @@ class app.views.EntryPage extends app.View
 
   restore: ->
     if @cacheMap[path = @entry.filePath()]
-      @render @cacheMap[path]
+      @render @cacheMap[path], true
       true
 
   onClick: (event) =>
-    if event.target.hasAttribute 'data-retry'
+    target = event.target
+    if target.hasAttribute 'data-retry'
       $.stopEvent(event)
       @load()
+    else if target.classList.contains '_pre-clip'
+      $.stopEvent(event)
+      target.classList.add if $.copyToClipboard(target.parentNode.textContent) then '_pre-clip-success' else '_pre-clip-error'
+      setTimeout (-> target.className = '_pre-clip'), 2000
+    return
+
+  onAltO: =>
+    return unless link = @find('._attribution:last-child ._attribution-link')
+    $.popup(link.href + location.hash)
     return

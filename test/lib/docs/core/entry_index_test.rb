@@ -3,7 +3,7 @@ require 'docs'
 
 class DocsEntryIndexTest < MiniTest::Spec
   let :entry do
-    Docs::Entry.new 'name', 'type', 'path'
+    Docs::Entry.new 'name', 'path', 'type'
   end
 
   let :index do
@@ -29,7 +29,11 @@ class DocsEntryIndexTest < MiniTest::Spec
     end
 
     it "stores an array of entries" do
-      entries = [entry, entry]
+      entries = [
+        Docs::Entry.new('one', 'path', 'type'),
+        Docs::Entry.new('two', 'path', 'type')
+      ]
+
       index.add(entries)
       assert_equal entries, index.entries
     end
@@ -46,11 +50,17 @@ class DocsEntryIndexTest < MiniTest::Spec
       assert_empty index.types
     end
 
+    it "doesn't store the same entry twice" do
+      2.times { index.add(entry.dup) }
+      assert_equal [entry], index.entries
+    end
+
     it "creates and indexes the type" do
-      entry.type = 'one'; index.add(entry)
-      entry.type = 'two'; 2.times { index.add(entry) }
-      assert_equal ['one', 'two'], index.types.keys
-      assert_instance_of Docs::Type, index.types['one']
+      index.add Docs::Entry.new('one', 'path', 'a')
+      index.add Docs::Entry.new('two', 'path', 'b')
+      index.add Docs::Entry.new('three', 'path', 'b')
+      assert_equal ['a', 'b'], index.types.keys
+      assert_instance_of Docs::Type, index.types['a']
     end
 
     it "doesn't index the nil type" do
@@ -59,19 +69,24 @@ class DocsEntryIndexTest < MiniTest::Spec
     end
 
     it "increments the type's count" do
-      2.times { index.add(entry) }
-      assert_equal 2, index.types[entry.type].count
+      index.add Docs::Entry.new('one', 'path', 'type')
+      index.add Docs::Entry.new('two', 'path', 'type')
+      assert_equal 2, index.types['type'].count
     end
   end
 
-  describe "#empty?" do
-    it "returns true when entries have been added" do
+  describe "#empty? / #blank? / #present?" do
+    it "is #empty? and #blank? when no entries have been added" do
       assert index.empty?
+      assert index.blank?
+      refute index.present?
     end
 
-    it "returns false when an entry has been added" do
+    it "is #present? when an entry has been added" do
       index.add(entry)
       refute index.empty?
+      refute index.blank?
+      assert index.present?
     end
   end
 
@@ -86,16 +101,26 @@ class DocsEntryIndexTest < MiniTest::Spec
       end
 
       it "includes the json representation of the #entries" do
-        index.add [entry, entry]
-        assert_equal [entry.as_json, entry.as_json], index.as_json[:entries]
+        index.add one = Docs::Entry.new('one', 'path', 'type')
+        index.add two = Docs::Entry.new('two', 'path', 'type')
+        assert_equal [one.as_json, two.as_json], index.as_json[:entries]
       end
 
       it "is sorted by name, case-insensitive" do
         entry.name = 'B'; index.add(entry)
         entry.name = 'a'; index.add(entry)
         entry.name = 'c'; index.add(entry)
-        entry.name = nil; index.add(entry)
-        assert_equal [nil, 'a', 'B', 'c'], index.as_json[:entries].map { |e| e[:name] }
+        assert_equal ['a', 'B', 'c'], index.as_json[:entries].map { |e| e[:name] }
+      end
+
+      it "sorts numbered names" do
+        entry.name = '4.2.2. Test'; index.add(entry)
+        entry.name = '4.20. Test'; index.add(entry)
+        entry.name = '4.3. Test'; index.add(entry)
+        entry.name = '4. Test'; index.add(entry)
+        entry.name = '2 Test'; index.add(entry)
+        entry.name = 'Test'; index.add(entry)
+        assert_equal ['4. Test', '4.2.2. Test', '4.3. Test', '4.20. Test', '2 Test', 'Test'], index.as_json[:entries].map { |e| e[:name] }
       end
     end
 
@@ -115,6 +140,16 @@ class DocsEntryIndexTest < MiniTest::Spec
         entry.type = 'a'; index.add(entry)
         entry.type = 'c'; index.add(entry)
         assert_equal ['a', 'B', 'c'], index.as_json[:types].map { |e| e[:name] }
+      end
+
+      it "sorts numbered names" do
+        entry.type = '1.8.2. Test'; index.add(entry)
+        entry.type = '1.90. Test'; index.add(entry)
+        entry.type = '1.9. Test'; index.add(entry)
+        entry.type = '9. Test'; index.add(entry)
+        entry.type = '1 Test'; index.add(entry)
+        entry.type = 'Test'; index.add(entry)
+        assert_equal ['1.8.2. Test', '1.9. Test', '1.90. Test', '9. Test', '1 Test', 'Test'], index.as_json[:types].map { |e| e[:name] }
       end
     end
   end

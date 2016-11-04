@@ -10,7 +10,10 @@ class app.views.RootPage extends app.View
   render: ->
     @empty()
     @append @tmpl('mobileNav') if app.isMobile()
-    @append @tmpl if @isHidden() then 'splash' else if app.isMobile() then 'mobileIntro' else 'intro'
+    if app.isAndroidWebview()
+      @append @tmpl('androidWarning')
+    else
+      @append @tmpl if @isHidden() then 'splash' else if app.isMobile() then 'mobileIntro' else 'intro'
     return
 
   hideIntro: ->
@@ -19,11 +22,11 @@ class app.views.RootPage extends app.View
     return
 
   setHidden: (value) ->
-    app.store.set 'hideIntro', value
+    app.settings.set 'hideIntro', value
     return
 
   isHidden: ->
-    app.isSingleDoc() or app.store.get 'hideIntro'
+    app.isSingleDoc() or app.settings.get 'hideIntro'
 
   onRoute: ->
 

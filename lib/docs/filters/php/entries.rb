@@ -3,6 +3,7 @@ module Docs
     class EntriesFilter < Docs::EntriesFilter
       TYPE_BY_NAME_STARTS_WITH = {
         'ArrayObject'     => 'SPL',
+        'Collectable'     => 'pthreads',
         'Cond'            => 'pthreads',
         'CURL'            => 'cURL',
         'Date'            => 'Date/Time',
@@ -12,21 +13,24 @@ module Docs
         'Http'            => 'HTTP',
         'Mutex'           => 'pthreads',
         'php_user_filter' => 'Stream',
+        'Pool'            => 'pthreads',
         'Reflector'       => 'Reflection',
         'Soap'            => 'SOAP',
         'SplFile'         => 'SPL/File',
         'SplTempFile'     => 'SPL/File',
         'Spl'             => 'SPL',
         'Stackable'       => 'pthreads',
+        'Sync'            => 'Sync',
         'streamWrapper'   => 'Stream',
         'Thread'          => 'pthreads',
         'tidy'            => 'Tidy',
         'Worker'          => 'pthreads',
         'XsltProcessor'   => 'XSLT',
+        'Yar'             => 'Yar',
         'ZipArchive'      => 'Zip' }
 
-      %w(APC AMQP Directory DOM Gearman Gmagick Imagick mysqli OAuth PDO
-         Reflection Session SimpleXML Solr Sphinx SQLite3 Varnish XSLT Yaf).each do |str|
+      %w(APC Directory DOM Event Gearman Gmagick Imagick mysqli OAuth PDO Phar Reflection
+        Session SimpleXML Solr Sphinx SQLite3 Varnish XSLT Yaf).each do |str|
         TYPE_BY_NAME_STARTS_WITH[str] = str
       end
 
@@ -44,13 +48,16 @@ module Docs
       end
 
       REPLACE_TYPES = {
+        'Error'             => 'Errors',
         'Exceptions'        => 'SPL/Exceptions',
+        'finfo'             => 'File System',
         'GD and Image'      => 'Image',
         'Gmagick'           => 'Image/GraphicsMagick',
         'Imagick'           => 'Image/ImageMagick',
         'Interfaces'        => 'SPL/Interfaces',
         'Iterators'         => 'SPL/Iterators',
         'mysqli'            => 'Database/MySQL',
+        'PCRE Patterns'     => 'PCRE Reference',
         'PostgreSQL'        => 'Database/PostgreSQL',
         'Session'           => 'Sessions',
         'Session PgSQL'     => 'Database/PostgreSQL',
@@ -60,7 +67,7 @@ module Docs
         'Yaml'              => 'YAML' }
 
       TYPE_GROUPS = {
-        'Classes and Functions' => ['Classes/Object', 'Function handling', 'Predefined Interfaces and Classes', 'runkit'],
+        'Classes and Functions' => ['Classes/Object', 'Function handling', 'Predefined Interfaces and Classes', 'runkit', 'Throwable'],
         'Encoding'              => ['Gettext', 'iconv', 'Multibyte String'],
         'Compression'           => ['Bzip2', 'Zip', 'Zlib'],
         'Cryptography'          => ['Hash', 'Mcrypt', 'OpenSSL', 'Password Hashing'],
@@ -73,7 +80,7 @@ module Docs
         'Mail'                  => ['Mail', 'Mailparse'],
         'Mathematics'           => ['BC Math', 'Math', 'Statistic'],
         'Networking'            => ['GeoIP', 'Network', 'Output Control', 'SSH2', 'Socket', 'URL'],
-        'Process Control'       => ['Eio', 'Libevent', 'POSIX', 'Program execution', 'pthreads'],
+        'Process Control'       => ['Eio', 'Libevent', 'POSIX', 'Program execution', 'pthreads', 'PCNTL', 'Ev', 'Semaphore', 'Shared Memory', 'Sync'],
         'String'                => ['Ctype', 'PCRE', 'POSIX Regex', 'Taint'],
         'Variables'             => ['Filter', 'Variable handling'],
         'XML'                   => ['libxml', 'SimpleXML', 'XML Parser', 'XML-RPC', 'XMLReader', 'XMLWriter', 'XSLT'] }
@@ -81,16 +88,20 @@ module Docs
       def get_name
         return 'IntlException' if slug == 'class.intlexception'
         name = css('> .sect1 > .title', 'h1', 'h2').first.content
-        name.sub! 'The ', ''
+        name.remove! 'The '
         name.sub! ' class', ' (class)'
         name.sub! ' interface', ' (interface)'
         name
       end
 
       def get_type
+        return 'Language Reference' if subpath.start_with?('language.') || subpath.start_with?('functions.')
+        return 'PCRE Reference' if subpath.start_with?('regexp.')
+
         type = at_css('.up').content.strip
         type = 'SPL/Iterators' if type.end_with? 'Iterator'
-        type.sub! ' Functions', ''
+        type = 'Ev' if type =~ /\AEv[A-Z]/
+        type.remove! ' Functions'
 
         TYPE_BY_NAME_STARTS_WITH.each_pair do |key, value|
           break type = value if name.start_with?(key)
@@ -106,7 +117,7 @@ module Docs
       end
 
       def include_default_entry?
-        !initial_page? && doc.at_css('.reference', '.refentry', '.sect1')
+        !initial_page? && doc.at_css('.reference', '.refentry', '.sect1', '.simpara', '.para')
       end
     end
   end

@@ -1,9 +1,10 @@
 source 'https://rubygems.org'
-ruby '2.1.0'
+ruby '2.3.1'
 
+gem 'rake'
 gem 'thor'
-gem 'pry', '~> 0.9.12'
-gem 'activesupport', '~> 4.0', require: false
+gem 'pry', '~> 0.10.0'
+gem 'activesupport', '~> 4.2', require: false
 gem 'yajl-ruby', require: false
 
 group :app do
@@ -29,15 +30,17 @@ end
 
 group :docs do
   gem 'typhoeus'
-  gem 'nokogiri', '~> 1.6.0'
+  gem 'nokogiri'
   gem 'html-pipeline'
   gem 'progress_bar', require: false
   gem 'unix_utils', require: false
+  gem 'tty-pager', require: false
 end
 
 group :test do
   gem 'minitest'
   gem 'rr', require: false
+  gem 'rack-test', require: false
 end
 
 if ENV['SELENIUM'] == '1'

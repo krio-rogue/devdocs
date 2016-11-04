@@ -20,6 +20,10 @@ module Docs
       context[:base_url]
     end
 
+    def links
+      context[:links]
+    end
+
     def current_url
       context[:url]
     end
@@ -41,7 +45,7 @@ module Docs
     end
 
     def slug
-      @slug ||= subpath.sub(/\A\//, '').sub(/\.html\z/, '')
+      @slug ||= subpath.sub(/\A\//, '').remove(/\.html\z/)
     end
 
     def root_page?
@@ -58,6 +62,12 @@ module Docs
       str[0] == '#'
     end
 
+    DATA_URL = 'data:'.freeze
+
+    def data_url_string?(str)
+      str.start_with?(DATA_URL)
+    end
+
     def relative_url_string?(str)
       !fragment_url_string?(str) && str !~ SCHEME_RGX
     end
@@ -69,6 +79,21 @@ module Docs
     def parse_html(html)
       warn "#{self.class.name} is re-parsing the document" unless ENV['RACK_ENV'] == 'test'
       super
+    end
+
+    def decode_cloudflare_email(str)
+      mask = "0x#{str[0..1]}".hex | 0
+      result = ''
+
+      str.chars.drop(2).each_slice(2) do |slice|
+        result += "%" + "0#{("0x#{slice.join}".hex ^ mask).to_s(16)}"[-2..-1]
+      end
+
+      URI.decode(result)
+    end
+
+    def clean_path(path)
+      path.gsub %r{[!;:]+}, '-'
     end
   end
 end

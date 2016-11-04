@@ -2,84 +2,94 @@ module Docs
   class Angular
     class CleanHtmlFilter < Filter
       def call
-        # Fix internal links (remove colons)
-        css('a[href]').each do |node|
-          node['href'] = node['href'].gsub %r{(directive|filter):}, '\1-'
+        container = at_css('article.docs-content')
+        badges = css('header.hero .badge, header.hero .hero-subtitle').map do |node|
+          node.name = 'span'
+          node['class'] = 'status-badge'
+          node.to_html
+        end.join(' ')
+        badges = %(<div class="badges">#{badges}</div>)
+        container.child.before(at_css('header.hero h1')).before(badges).before(css('header.hero + .banner'))
+        @doc = container
+
+        title = at_css('h1').content.strip
+        if title == 'Index'
+          at_css('h1').content = result[:entries].first.name
+        elsif title == 'Angular'
+          at_css('h1').content = slug.split('/').last.gsub('-', ' ')
         end
 
-        root_page? ? root : other
-        doc
-      end
+        css('pre.no-bg-with-indent').each do |node|
+          node.content = '  ' + node.content.gsub("\n", "\n  ")
+        end
 
-      def root
-        css('.pull-right', '.ng-hide').remove
+        css('.openParens').each do |node|
+          node.parent.name = 'pre'
+          node.parent.content = node.parent.css('code, pre').map(&:content).join("\n")
+        end
 
-        # Turn "module [...]" <li> into <h2>
-        css('.nav-header.module').each do |node|
+        css('button.verbose', 'button.verbose + .l-verbose-section', 'a[id=top]', 'a[href="#top"]').remove
+
+        css('.c10', '.showcase', '.showcase-content', '.l-main-section', 'div.div', 'div[flex]', 'code-tabs', 'md-card', 'md-card-content', 'div:not([class])', 'footer', '.card-row', '.card-row-container', 'figure', 'blockquote', 'exported', 'defined', 'div.ng-scope', '.code-example header').each do |node|
+          node.before(node.children).remove
+        end
+
+        css('span.badges').each do |node|
+          node.name = 'div'
+        end
+
+        css('pre[language]').each do |node|
+          node['data-language'] = node['language'].sub(/\Ats/, 'typescript').strip
+        end
+
+        css('pre.prettyprint').each do |node|
+          node.content = node.content.strip
+        end
+
+        css('a[id]:empty').each do |node|
+          node.next_element['id'] = node['id'] if node.next_element
+        end
+
+        css('a[name]:empty').each do |node|
+          node.next_element['id'] = node['name'] if node.next_element
+        end
+
+        css('tr[style]').each do |node|
+          node.remove_attribute 'style'
+        end
+
+        css('h1:not(:first-child)').each do |node|
           node.name = 'h2'
-          node.parent.before(node)
+        end unless at_css('h2')
+
+        css('img[style]').each do |node|
+          node['align'] ||= node['style'][/float:\s*(left|right)/, 1]
+          node['style'] = node['style'].split(';').map(&:strip).select { |s| s =~ /\Awidth|height/ }.join(';')
         end
 
-        # Remove links to "Directive", "Filter", etc.
-        css('a.guide').each do |node|
-          node.replace(node.content)
-        end
-      end
-
-      def other
-        css('#example', '.example', '#description_source', '#description_demo', '[id$="example"]').remove
-
-        if at_css('h1').content.strip.empty?
-          # Ensure proper <h1> (e.g. ngResource, AUTO, etc.)
-          at_css('h2').tap do |node|
-            at_css('h1').content = node.try(:content) || slug
-            node.try(:remove)
-          end
-        else
-          # Clean up .hint in <h1>
-          css('h1 > div > .hint').each do |node|
-            node.parent.before("<small>(#{node.content.strip})</small>").remove
-          end
+        css('.example-title + pre').each do |node|
+          node['name'] = node.previous_element.content.strip
+          node.previous_element.remove
         end
 
-        at_css('h1').add_child(css('.view-source', '.improve-docs'))
-
-        # Remove root-level <div>
-        while div = at_css('h1 + div')
-          div.before(div.children)
-          div.remove
+        css('pre[name]').each do |node|
+          node.before(%(<div class="pre-title">#{node['name']}</div>))
         end
 
-        # Remove dead links (e.g. ngRepeat)
-        css('a.type-hint').each do |node|
-          node.name = 'code'
-          node.remove_attribute 'href'
+        css('a.is-button > h3').each do |node|
+          node.parent.content = node.content
         end
 
-        # Remove some <code> elements
-        css('h1 > code', 'pre > code', 'h6 > code').each do |node|
-          node.before(node.content).remove
+        css('#angular-2-glossary ~ .l-sub-section').each do |node|
+          node.before(node.children).remove
         end
 
-        # Fix code indentation
-        css('code', 'pre').each do |node|
-          node.inner_html = node.inner_html.strip_heredoc.strip
+        location_badge = at_css('.location-badge')
+        if location_badge && doc.last_element_child != location_badge
+          doc.last_element_child.after(location_badge)
         end
 
-        # Make <pre> elements
-        css('.in-javascript', '.in-html-template-binding').each do |node|
-          node.name = 'pre'
-          node.content = node.content
-        end
-
-        css('ul.methods', 'ul.properties', 'ul.events').add_class('defs')
-
-        # Remove ng-* attributes
-        css('*').each do |node|
-          node.attributes.each_key do |attribute|
-            node.remove_attribute(attribute) if attribute.start_with? 'ng-'
-          end
-        end
+        doc
       end
     end
   end

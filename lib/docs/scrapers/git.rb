@@ -1,18 +1,22 @@
 module Docs
   class Git < UrlScraper
     self.type = 'git'
-    self.version = '1.8.5'
-    self.base_url = 'http://git-scm.com/docs'
+    self.release = '2.10.0'
+    self.base_url = 'https://git-scm.com/docs'
     self.initial_paths = %w(/git.html)
+    self.links = {
+      home: 'https://git-scm.com/',
+      code: 'https://github.com/git/git'
+    }
 
-    html_filters.push 'git/clean_html', 'git/entries'
+    html_filters.push 'git/entries', 'git/clean_html'
 
-    options[:container] = ->(filter) { filter.root_page? ? '#main' : '.man-page' }
-    options[:follow_links] = ->(filter) { filter.root_page? }
-    options[:only_patterns] = [/\A\/git\-/]
+    options[:container] = '#content'
+    options[:only_patterns] = [/\A\/[^\/]+\z/]
+    options[:skip] = %w(/howto-index.html)
 
     options[:attribution] = <<-HTML
-      &copy; 2005&ndash;2013 Linus Torvalds and others<br>
+      &copy; 2005&ndash;2016 Linus Torvalds and others<br>
       Licensed under the GNU General Public License version 2.
     HTML
   end

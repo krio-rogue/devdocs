@@ -3,7 +3,7 @@ require 'set'
 module Docs
   class Scraper < Doc
     class << self
-      attr_accessor :base_url, :root_path, :initial_paths, :options, :html_filters, :text_filters
+      attr_accessor :base_url, :root_path, :initial_paths, :options, :html_filters, :text_filters, :stubs
 
       def inherited(subclass)
         super
@@ -13,15 +13,22 @@ module Docs
           autoload_all "docs/filters/#{to_s.demodulize.underscore}", 'filter'
         end
 
+        subclass.base_url = base_url
         subclass.root_path = root_path
         subclass.initial_paths = initial_paths.dup
         subclass.options = options.deep_dup
         subclass.html_filters = html_filters.inheritable_copy
         subclass.text_filters = text_filters.inheritable_copy
+        subclass.stubs = stubs.dup
       end
 
       def filters
         html_filters.to_a + text_filters.to_a
+      end
+
+      def stub(path, &block)
+        @stubs[path] = block
+        @stubs
       end
     end
 
@@ -29,12 +36,30 @@ module Docs
 
     self.initial_paths = []
     self.options = {}
+    self.stubs = {}
 
     self.html_filters = FilterStack.new
     self.text_filters = FilterStack.new
 
     html_filters.push 'container', 'clean_html', 'normalize_urls', 'internal_urls', 'normalize_paths'
     text_filters.push 'inner_html', 'clean_text', 'attribution'
+
+    def initialize
+      super
+      initialize_stubs
+    end
+
+    def initialize_stubs
+      self.class.stubs.each do |path, block|
+        Typhoeus.stub(url_for(path)).and_return do
+          Typhoeus::Response.new \
+            effective_url: url_for(path),
+            code: 200,
+            headers: { 'Content-Type' => 'text/html' },
+            body: self.instance_exec(&block)
+        end
+      end
+    end
 
     def build_page(path)
       response = request_one url_for(path)
@@ -100,6 +125,7 @@ module Docs
           (options[:only] ||= []).concat initial_paths + (root_path? ? [root_path] : ['', '/'])
         end
 
+        options.merge!(additional_options) if respond_to?(:additional_options, true)
         options.freeze
       end
     end
@@ -134,10 +160,18 @@ module Docs
       else
         instrument 'ignore_response.scraper', response: response
       end
+    rescue => e
+      if Docs.rescue_errors
+        instrument 'error.doc', exception: e, url: response.url
+        nil
+      else
+        raise e
+      end
     end
 
     def process_response(response)
-      pipeline.call parse(response.body), pipeline_context(response), data = {}
+      data = {}
+      pipeline.call(parse(response.body), pipeline_context(response), data)
       data
     end
 
@@ -147,6 +181,76 @@ module Docs
 
     def parse(string)
       Parser.new(string).html
+    end
+
+    def with_filters(*filters)
+      stack = FilterStack.new
+      stack.push(*filters)
+      pipeline.instance_variable_set :@filters, stack.to_a.freeze
+      yield
+    ensure
+      @pipeline = nil
+    end
+
+    module FixInternalUrlsBehavior
+      def self.included(base)
+        base.extend ClassMethods
+      end
+
+      module ClassMethods
+        attr_reader :internal_urls
+
+        def store_pages(store)
+          instrument 'info.doc', msg: 'Building internal urls...'
+          with_internal_urls do
+            instrument 'info.doc', msg: 'Building pages...'
+            super
+          end
+        end
+
+        private
+
+        def with_internal_urls
+          @internal_urls = new.fetch_internal_urls
+          yield
+        ensure
+          @internal_urls = nil
+        end
+      end
+
+      def fetch_internal_urls
+        result = []
+        build_pages do |page|
+          result << base_url.subpath_to(page[:response_url]) if page[:entries].present?
+        end
+        result
+      end
+
+      def initial_urls
+        return super unless self.class.internal_urls
+        @initial_urls ||= self.class.internal_urls.map(&method(:url_for)).freeze
+      end
+
+      private
+
+      def additional_options
+        if self.class.internal_urls
+          {
+            only: self.class.internal_urls.to_set,
+            only_patterns: nil,
+            skip: nil,
+            skip_patterns: nil,
+            skip_links: nil,
+            fixed_internal_urls: true
+          }
+        else
+          {}
+        end
+      end
+
+      def process_response(response)
+        super.merge! response_url: response.url
+      end
     end
   end
 end

@@ -2,21 +2,11 @@ module Docs
   class D3
     class CleanHtmlFilter < Filter
       def call
-        css('#gollum-footer', '.markdown-body > blockquote:first-child', '.anchor').remove
+        css('p:contains("This page describes the D3 3.x API.")').remove
 
-        # Replace #head with <h1>
-        css('#head > h1').each do |node|
-          node.parent.before(node).remove
-          node.content = 'D3.js' if root_page?
-        end
-
-        # Move content to the root-level
-        css('#wiki-content').each do |node|
-          node.before(node.at_css('.markdown-body').children).remove
-        end
-
-        # Remove links inside <h2>
-        css('h2 > a').each do |node|
+        # Remove links inside <h2> and add "id" attributes
+        css('a.anchor').each do |node|
+          node.parent['id'] = (node['id'] || node['name']).remove('user-content-') if node['id'] || node['name']
           node.before(node.children).remove
         end
 
@@ -25,14 +15,42 @@ module Docs
           next unless node['name'] || node.content == '#'
           parent = node.parent
           parent.name = 'h6'
-          parent['id'] = (node['name'] || node['href'].sub(/\A.+#/, '')).sub('wiki-', '')
-          parent.css('a[name]').remove
+          parent['id'] = (node['name'] || node['href'].remove(/\A.+#/)).remove('user-content-')
+          parent.css('a[name], a:contains("#")').remove
           node.remove
+        end
+
+        css('h4').each { |node| node.name = 'h3' } if root_page?
+
+        css('a > img').each do |node|
+          node.parent.before(node).remove
+        end
+
+        css('h6 a[title="Source"]').each do |node|
+          node.content = 'Source'
+          node['class'] = 'source'
+        end
+
+        # Fix internal links
+        css('a[href]').each do |node|
+          node['href'] = node['href'].sub(/#user\-content\-(\w+?)\z/, '#\1').sub(/#wiki\-(\w+?)\z/, '#\1')
         end
 
         # Remove code highlighting
         css('.highlight > pre').each do |node|
           node.content = node.content
+          node['data-language'] = if node.parent['class'].include?('html')
+            'markup'
+          elsif node.parent['class'].include?('css')
+            'css'
+          else
+            'javascript'
+          end
+          node.parent.before(node).remove
+        end
+
+        css('pre > code').each do |node|
+          node.before(node.children).remove
         end
 
         doc

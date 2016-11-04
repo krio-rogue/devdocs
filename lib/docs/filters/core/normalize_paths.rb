@@ -21,12 +21,12 @@ module Docs
     end
 
     def normalized_subpath
-      normalize_path subpath.sub(/\A\//, '')
+      normalize_path subpath.remove(/\A\//)
     end
 
     def normalize_href(href)
       url = URL.parse(href)
-      url.path = normalize_path(url.path)
+      url.send(:set_path, normalize_path(url.path))
       url
     rescue URI::InvalidURIError
       href
@@ -34,7 +34,11 @@ module Docs
 
     def normalize_path(path)
       path = path.downcase
-      path.gsub! ':', '-'
+
+      if context[:decode_and_clean_paths]
+        path = URI.unescape(path)
+        path = clean_path(path)
+      end
 
       if path == '.'
         'index'

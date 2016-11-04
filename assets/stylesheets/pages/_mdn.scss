@@ -21,9 +21,12 @@
   }
 
   > h2 { @extend %block-heading; }
+  > h3 { @extend %block-label, %label-blue; }
+  > h4 { font-size: 1em; }
 
   > .note,
   .notice,
+  .warning,
   .overheadIndicator,
   .syntaxbox,           // CSS, JavaScript
   .twopartsyntaxbox,    // CSS
@@ -31,6 +34,8 @@
   .eval:first-of-type { // JavaScript
     @extend %note;
   }
+
+  .warning { @extend %note-red; }
 
   > .note {
     em {
@@ -55,7 +60,7 @@
   }
 
   .deprecated, .obsolete { @extend %label-red; }
-  .nonStandard, .projectSpecific, .experimental { @extend %label-yellow; }
+  .nonStandard, .projectSpecific, .experimental { @extend %label-orange; }
 
   .htmlelt,
   .cssprop {
@@ -76,12 +81,18 @@
         &:after { content: ':'; }
       }
     }
+
+    th, td {
+      background: none;
+      border: 0;
+    }
   }
 
   dt > strong > code, // HTML element attribute
   dl > dt > code {    // CSS property value, Javascript function argument
     font-family: inherit;
     font-weight: bold;
+    font-size: inherit;
   }
 
   .eventinfo { // DOM event

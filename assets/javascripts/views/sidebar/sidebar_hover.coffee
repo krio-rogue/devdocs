@@ -17,17 +17,14 @@ class app.views.SidebarHover extends app.View
       delete @constructor.events.mouseover
     super
 
-  init: ->
-    @offsetTop = @el.offsetTop
-    return
-
   show: (el) ->
     unless el is @cursor
       @hide()
-      if @isTarget(el) and @isTruncated(el)
+      if @isTarget(el) and @isTruncated(el.lastElementChild or el)
         @cursor = el
         @clone = @makeClone @cursor
         $.append document.body, @clone
+        @offsetTop ?= @el.offsetTop
         @position()
     return
 
@@ -39,27 +36,27 @@ class app.views.SidebarHover extends app.View
 
   position: =>
     if @cursor
-      top = $.rect(@cursor).top
-      if top >= @offsetTop
-        @clone.style.top = top + 'px'
+      rect = $.rect(@cursor)
+      if rect.top >= @offsetTop
+        @clone.style.top = rect.top + 'px'
+        @clone.style.left = rect.left + 'px'
       else
         @hide()
     return
 
   makeClone: (el) ->
-    clone = el.cloneNode()
-    clone.textContent = el.textContent
+    clone = el.cloneNode(true)
     clone.classList.add 'clone'
     clone
 
   isTarget: (el) ->
-    el.classList.contains @constructor.itemClass
+    el?.classList?.contains @constructor.itemClass
 
   isSelected: (el) ->
     el.classList.contains 'active'
 
   isTruncated: (el) ->
-    el.scrollWidth >= el.offsetWidth
+    el.scrollWidth > el.offsetWidth
 
   onFocus: (event) =>
     @focusTime = Date.now()
